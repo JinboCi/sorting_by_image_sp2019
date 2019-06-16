@@ -20,53 +20,69 @@ usage example:
 '''
 
 class ConnectToArduino:
-    deviceName = "MyBlueTooth"
+    deviceName = ""
+    deivceAvailable = False
+    Connected = False
+    port = 1
     MacAddr = ""
     sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+    StartByte = 121
+    InterStart = 122
+    InterEnd = 123
+    EndByte = 124
+    positive = 125
+    negative = 126
+    WaitTime = 0.01
+    Timeout = 0.1
+    expansion = 3
     
+    def __init__(self, name):
+        self.SetName(name)
+        self.FindMacAddr()
+        self.ConnectDevice()
     def SetName(self, newName):
         self.deviceName = newName
         
     def FindMacAddr(self):
         #Look for all Bluetooth devices
         #the computer knows about.
-        print ("Searching for devices...")
         #Create an array with all the MAC
         #addresses of the detected devices
         nearby_devices = bluetooth.discover_devices()
         #Run through all the devices found and list their name
         for i in nearby_devices:
-            #print(bluetooth.lookup_name( i ))
-            if(self.deviceName==bluetooth.lookup_name( i )):
-                print("find it")
-                bd_addr = i
-                return (True, bd_addr)
-        print("bad name")
-        return (False, "")
+            if(self.deviceName==bluetooth.lookup_name(i)):
+                print("Find", self.deviceName)
+                self.MacAddr = i
+                self.deviceAvailable = True
+                return
+        print("Cannot find", self.deviceName)
     
     def ConnectDevice(self):
         #Allow the user to select their Arduino
         #bluetooth module. They must have paired
         #it before hand.
+        if (self.deviceAvailable == False):
+            print("Device Unavailable")
+            return
+        if (self.Connected == True):
+            print("Already Connected")
+            return
         print ("Starting a communication with", bluetooth.lookup_name(self.MacAddr))
-        port = 1
-        print ("Connecting to", bluetooth.lookup_name(self.MacAddr))
+        
         sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
         #s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # sock has the type bluetooth.msbt.BluetoothSocket
-        sock.connect((self.MacAddr, port))
-        #sock.bind((self.MacAddr, port+1))        
-        print ("Connected")
-        return sock
-     
-    def __init__(self, name):
-        self.deviceName = name
-        tmp = self.FindMacAddr()
-        if (tmp[0] == True):
-            print(tmp[1])
-            self.MacAddr = tmp[1]
-            self.sock = self.ConnectDevice()
-            
+        try:
+            sock.connect((self.MacAddr, self.port))
+            self.sock = sock
+            self.Connected = True
+            print("Connected Successfully")
+        except:
+            print("Unable to Connected")
+    
+    def CloseConnection(self):
+        self.sock.close()
     '''
     function SendAndRead
     input: 
@@ -75,91 +91,79 @@ class ConnectToArduino:
     
     '''
     def SendAndRead(self, Byte, ExpectedResponse):
-        ##Byte = chr(Byte)
-        ##print(type(Byte))
-        ##print(Byte)
-        #pdb.set_trace()
-        print("SendAndRead", Byte, ExpectedResponse)
-        #.self.sock.accept()
-        self.sock.send(Byte.encode())
-        print("send", ord(list(Byte)[0]))
-        #Response = self.sock.recv(1024)
-        self.sock.settimeout(0.1)
-        
-        
+        self.sock.send(chr(Byte))
+        print("Sending", Byte)
+        self.sock.settimeout(self.Timeout)
         try:
-            Response = self.sock.recv(1024)
+            Response = self.sock.recv(1)
         except socket.error:
-            print("connection timed out!")
+            print("Timed out!")
             return 0
-        #pdb.set_trace()
-        print("recv", list(Response)[0])
-        print(list(Response)[-1])
-        print(ord(list(ExpectedResponse)[0]))
-        if (list(Response)[-1] == ord(list(ExpectedResponse)[0])):
-            print("success")
+        print("Receive", Response)
+        print(ExpectedResponse)
+        if (ord(Response) == ExpectedResponse):
+            print("Handshake success")
             return 1 # success
         else:
+            print("Handshake failed")
             return 0 # failed
-
-        
     
     '''
     function SendData:
-        input: (dataArr[], StartByte, InterStart, InterEnd, EndByte, WaitTime)
     '''
     
-    def SendData(self, dataArr, StartByte, InterStart, InterEnd, EndByte, positive, negative, WaitTime):
-        ##print(dataArr)
-        ##print(type(StartByte))
+    def SendData(self, dataArr):
         print("SendData")
-        while (1!=self.SendAndRead(StartByte, StartByte)):
+        if (self.Connected == False):
+            print("Not Connected")
+            return
+        while (1!=self.SendAndRead(self.StartByte, self.StartByte)):
             print("StartByte, StatByte")
             #sleep(WaitTime)     
-        while (1!=self.SendAndRead(chr(len(dataArr)), chr(len(dataArr)))):
+        while (1!=self.SendAndRead(len(dataArr), len(dataArr))):
             print("len(dataArr), len(dataArr)")
-            #sleep(WaitTime)
-            #sleep(WaitTime) 
-            '''
-        while (1!=self.SendAndRead(StartByte, StartByte)):
-            print("StartByte, StatByte")
-            '''
+            #sleep(WaitTime)  
         for idx in range(len(dataArr)):
             
-            while (1!=self.SendAndRead(InterStart, InterStart)):
+            while (1!=self.SendAndRead(self.InterStart, self.InterStart)):
                 print("InterStart, InterStart")
                 #sleep(WaitTime)        
                 
             if (dataArr[idx] < 0):
-                while (1!=self.SendAndRead(negative, negative)):
-                    print("ne", InterStart)
+                while (1!=self.SendAndRead(self.negative, self.negative)):
+                    print("Negative", self.InterStart)
                     #sleep(WaitTime)
             else:
-                while (1!=self.SendAndRead(positive, positive)):
-                    print("po", positive)
+                while (1!=self.SendAndRead(self.positive, self.positive)):
+                    print("Positive", self.positive)
                     #sleep(WaitTime)                
-            while (1!=self.SendAndRead(chr(abs(dataArr[idx])), chr(abs(dataArr[idx])))):
-                print("dataArr[idx]", idx, dataArr[idx])
+            while (1!=self.SendAndRead(abs(dataArr[idx]), abs(dataArr[idx]))):
+                print("dataArr", idx, dataArr[idx])
                 #sleep(WaitTime)
                 
-            while (1!=self.SendAndRead(InterEnd, InterEnd)):
+            while (1!=self.SendAndRead(self.InterEnd, self.InterEnd)):
                 print("InterEnd, InterEnd")
                 #sleep(WaitTime)
                 
-        self.sock.send(EndByte.encode())
+        while (1!=self.SendAndRead(self.EndByte, self.EndByte)):
+                print("InterEnd", self.EndByte)
+        
+    def DataConverter(self, dataArr):
+        res = [0]*len(dataArr)*self.expansion
+        for i in range(len(dataArr)):
+            sign = 1
+            current_val = dataArr[i]
+            if current_val < 0:
+                sign = -1
+                current_val = -current_val
+            for j in range(self.expansion):
+                res[i*self.expansion+self.expansion-j-1] = int(sign*(current_val%100))
+                current_val = int((current_val - (current_val%100))/100)
+        return res    
             
-            
-StartByte = 121
-InterStart = 122
-InterEnd = 123
-EndByte = 124
-WaitTime = 0.01
-positive = 125
-negative = 126
-dataArr = [1,2,3,4,5,6,7,8,9,10,20,30,40,60,80,-10,-20,-60,-90]
-#arr = [1,2,3,4,5,6,7,8,9,10,20,30,40,60,80,110,130,150,170,190,200,210]
+
+dataArr = [-1800, 2200, 1500, 8000]
 a = ConnectToArduino("MyBlueTooth")
-#for i in arr:
-#    a.SendAndRead(chr(i),chr(i))
-a.SendData(dataArr, chr(StartByte), chr(InterStart), chr(InterEnd), chr(EndByte), chr(positive), chr(negative), WaitTime)
-a.sock.close()
+arr = a.DataConverter(dataArr)
+a.SendData(a.DataConverter(dataArr))
+a.CloseConnection()

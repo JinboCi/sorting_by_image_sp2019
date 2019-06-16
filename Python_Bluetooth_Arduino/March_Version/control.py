@@ -6,7 +6,7 @@ from time import sleep
 import serial
 
 #some variables that need to be preset
-device_name = "HC-06"
+device_name = "MyBlueTooth"
 #you may need to change the data
 #the duty cycle = (data -32)/94
 
@@ -37,11 +37,12 @@ print ("")
 nearby_devices = bluetooth.discover_devices()
 #Run through all the devices found and list their name
 for i in nearby_devices:
-	if(device_name==bluetooth.lookup_name( i )):
-            print("find it")
-            print(type(i))
-            bd_addr = i
-            break
+    print(bluetooth.lookup_name( i ))
+    if(device_name==bluetooth.lookup_name( i )):
+        print("find it")
+        print(type(i))
+        bd_addr = i
+        break
 
 #Allow the user to select their Arduino
 #bluetooth module. They must have paired
@@ -52,7 +53,8 @@ port = 1
 print ("Connecting to", bluetooth.lookup_name( bd_addr ))
 sock = bluetooth.BluetoothSocket( bluetooth.RFCOMM )
 print(type(sock))
-#s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+print(bd_addr, port)
+#sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((bd_addr, port))
 print ("Connected")
 #print ("The duty Cycle should be:",(data_n -32)/94*100, "%" )

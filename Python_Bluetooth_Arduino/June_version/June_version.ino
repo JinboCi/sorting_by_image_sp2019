@@ -9,6 +9,7 @@ const int EndByte = 124;
 const int positive = 125;
 const int negative = 126;
 const int time_de= 1;
+const int expansion = 3;
 //Connect the Bluetooth module
 SoftwareSerial bluetooth(rxpin, txpin);
 
@@ -28,12 +29,14 @@ void setup()
 
 byte readoff(byte data, int wait_time) {
   byte buff;
-  
+  //Serial.println("Readoff");
+  //Serial.println(bluetooth.available());
   while (true) {
     while (!bluetooth.available()){
       delay(wait_time);
     }
     buff = bluetooth.read();
+    //Serial.println(buff);
     if (buff == data){
       bluetooth.write(data);
       buff = bluetooth.read();
@@ -44,6 +47,29 @@ byte readoff(byte data, int wait_time) {
   }
   return buff;
 }
+void readtill(byte data, int wait_time) {
+  byte buff;
+  //Serial.println("Readoff");
+  //Serial.println(bluetooth.available());
+  while (true) {
+    while (!bluetooth.available()){
+      delay(wait_time);
+    }
+    buff = bluetooth.read();
+    //Serial.println(buff);
+    if (buff != data){
+      bluetooth.write(data);
+      buff = bluetooth.read();
+      delay(wait_time);
+    } else {
+      for (int i = 0; i < 5; i++) {
+        bluetooth.write(data);
+        delay(wait_time);
+      }
+      break;
+    }
+  }
+}
 
 void loop() {
   // put your main code here, to run repeatedly:
@@ -53,13 +79,15 @@ void loop() {
   byte buff = bluetooth.read();
   int num = 0;
   int sign = 1;
+  //Serial.println(bluetooth.available());
   if (buff == StartByte) {
     //Serial.println((byte)buff); 
+    Serial.println(buff);
     bluetooth.write(buff);
     buff = readoff(StartByte, time_de);
     //buff = bluetooth.read();
     num = buff;
-    //Serial.println(num);
+    Serial.println(num);
     bluetooth.write(buff);
     buff = readoff(num, time_de);
     
@@ -68,8 +96,8 @@ void loop() {
     int data[num];
     for(int i = 0; i < num; i++) {
         buff = readoff(InterStart, time_de);
-        //Serial.print("Sign: ");
-        //Serial.println(buff);
+        Serial.print("Sign: ");
+        Serial.println(buff);
         sign = buff;
         bluetooth.write(sign);
         
@@ -81,19 +109,46 @@ void loop() {
         }
         int dataabs = buff;
         data[i] = sign*dataabs;
-        //Serial.println(data[i]); 
+        Serial.println(data[i]); 
         bluetooth.write(data[i]);  
         buff = readoff(dataabs, time_de);
+        Serial.println("InterEnd");
         buff = readoff(InterEnd, time_de);
+        Serial.println("InterEnddone");
  
     }
+    readtill(EndByte, time_de);
     // print out what we have received to Serial
+    /*
     Serial.println("data:");
     for(int i = 0; i < num; i++) {
       Serial.print(data[i]);
       Serial.print(" ");
     }
+    */
     Serial.println();
-  }
-  delay(time_de);
+    int data_final[num/expansion];
+    for (int i = 0; i < num; i++){
+      int sign = 1;
+      int current_res = 0;
+      for (int j = 0; j < expansion; j++){
+        int current_val = data[i*expansion+j];
+        if (current_val < 0)
+        {
+            sign = -1;
+            current_val = -current_val;
+        }
+        current_res = current_res*100;
+        current_res += current_val;
+      }
+      data_final[i] = sign*current_res;
+    }
+    for (int i = 0; i < num/3; i++){
+      Serial.print(data_final[i]);
+      Serial.print(" ");
+    }
+    Serial.println();
+}
+  delay(500);
+
 }
